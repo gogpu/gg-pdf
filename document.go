@@ -74,7 +74,7 @@ func (d *Document) NewPage(width, height int) recording.Backend {
 	pb.currentTransform = recording.Identity()
 
 	// Apply Y-flip transform
-	flipTransform := creator.Translate(0, float64(height)).Then(creator.Scale(1, -1))
+	flipTransform := creator.Scale(1, -1).Then(creator.Translate(0, float64(height)))
 	pb.surface.PushTransform(flipTransform)
 
 	d.pages = append(d.pages, pb)

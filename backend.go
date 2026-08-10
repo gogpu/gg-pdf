@@ -69,7 +69,7 @@ func (b *Backend) Begin(width, height int) error {
 
 	// Apply Y-flip transform to convert from top-left to bottom-left origin
 	// We need to translate by height and flip Y axis
-	flipTransform := creator.Translate(0, b.height).Then(creator.Scale(1, -1))
+	flipTransform := creator.Scale(1, -1).Then(creator.Translate(0, b.height))
 	b.surface.PushTransform(flipTransform)
 
 	return nil

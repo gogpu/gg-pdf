@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/coregx/gxpdf/creator"
 	"github.com/gogpu/gg"
 	"github.com/gogpu/gg/recording"
 )
@@ -53,6 +54,43 @@ func TestBackendLifecycle(t *testing.T) {
 	err = backend.End()
 	if err != nil {
 		t.Fatalf("End failed: %v", err)
+	}
+}
+
+func TestBackendYFlipTransform(t *testing.T) {
+	const height = 240
+
+	backend := NewBackend()
+	if err := backend.Begin(320, height); err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+
+	want := creator.Scale(1, -1).Then(creator.Translate(0, height))
+	if got := backend.surface.CurrentTransform(); got != want {
+		t.Fatalf("Y-flip transform = %#v, want %#v", got, want)
+	}
+
+	if err := backend.End(); err != nil {
+		t.Fatalf("End failed: %v", err)
+	}
+}
+
+func TestDocumentYFlipTransform(t *testing.T) {
+	const height = 240
+
+	doc := NewDocument()
+	backend, ok := doc.NewPage(320, height).(*pageBackend)
+	if !ok {
+		t.Fatal("Document.NewPage returned an unexpected backend type")
+	}
+
+	want := creator.Scale(1, -1).Then(creator.Translate(0, height))
+	if got := backend.surface.CurrentTransform(); got != want {
+		t.Fatalf("Y-flip transform = %#v, want %#v", got, want)
+	}
+
+	if err := doc.Finish(); err != nil {
+		t.Fatalf("Finish failed: %v", err)
 	}
 }
 
