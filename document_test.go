@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/coregx/gxpdf/creator"
 	"github.com/gogpu/gg/recording"
 )
 
@@ -138,6 +139,30 @@ func TestDocumentPageLifecycleValidation(t *testing.T) {
 			t.Fatalf("Begin error = %v, want a finalized-page error", err)
 		}
 	})
+}
+
+func TestDocumentPropagatesPageCreationFailure(t *testing.T) {
+	doc := NewDocument()
+	creationErr := errors.New("injected page creation failure")
+	doc.newPage = func() (*creator.Page, error) {
+		return nil, creationErr
+	}
+
+	page := doc.NewPage(200, 100)
+	if got := doc.PageCount(); got != 1 {
+		t.Fatalf("PageCount = %d, want failed page to remain tracked", got)
+	}
+	if err := page.Begin(200, 100); !errors.Is(err, creationErr) {
+		t.Fatalf("Begin error = %v, want %v", err, creationErr)
+	}
+
+	err := doc.Finish()
+	if !errors.Is(err, creationErr) {
+		t.Fatalf("Finish error = %v, want wrapped %v", err, creationErr)
+	}
+	if !strings.Contains(err.Error(), "failed to finish page") {
+		t.Fatalf("Finish error = %q, want page-finalization context", err)
+	}
 }
 
 func TestDocumentFinishAfterPageEndIsIdempotent(t *testing.T) {
