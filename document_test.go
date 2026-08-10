@@ -144,7 +144,7 @@ func TestDocumentPageLifecycleValidation(t *testing.T) {
 func TestDocumentPropagatesPageCreationFailure(t *testing.T) {
 	doc := NewDocument()
 	creationErr := errors.New("injected page creation failure")
-	doc.newPage = func() (*creator.Page, error) {
+	doc.newPage = func(_, _ float64) (*creator.Page, error) {
 		return nil, creationErr
 	}
 
