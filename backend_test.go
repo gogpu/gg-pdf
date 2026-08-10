@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/coregx/gxpdf/creator"
 	"github.com/gogpu/gg"
 	"github.com/gogpu/gg/recording"
 )
@@ -38,6 +39,82 @@ func TestBackendInterfaces(t *testing.T) {
 
 	// Test FileBackend interface
 	var _ recording.FileBackend = backend
+}
+
+func TestColorTranslationPreservesNormalizedComponents(t *testing.T) {
+	backend := NewBackend()
+	input := gg.RGBA2(0.2, 0.4, 0.8, 0.35)
+	brush := recording.NewSolidBrush(input)
+	want := creator.Color{R: input.R, G: input.G, B: input.B}
+
+	fill := backend.translateBrushToFill(brush)
+	if got, ok := fill.Paint.(creator.Color); !ok {
+		t.Fatalf("solid fill paint has type %T, want creator.Color", fill.Paint)
+	} else if got != want {
+		t.Errorf("solid fill color = %+v, want %+v", got, want)
+	}
+	if fill.Opacity != input.A {
+		t.Errorf("solid fill opacity = %v, want %v", fill.Opacity, input.A)
+	}
+
+	if got := backend.brushToColor(brush); got != want {
+		t.Errorf("brush color = %+v, want %+v", got, want)
+	}
+
+	stroke := backend.translateStroke(brush, recording.DefaultStroke())
+	if got, ok := stroke.Paint.(creator.Color); !ok {
+		t.Fatalf("stroke paint has type %T, want creator.Color", stroke.Paint)
+	} else if got != want {
+		t.Errorf("stroke color = %+v, want %+v", got, want)
+	}
+}
+
+func TestGradientTranslationPreservesNormalizedComponents(t *testing.T) {
+	backend := NewBackend()
+	stops := []gg.RGBA{
+		gg.RGB(0.1, 0.25, 0.5),
+		gg.RGB(0.75, 0.5, 0.2),
+	}
+
+	linear := recording.NewLinearGradientBrush(0, 0, 100, 100).
+		AddColorStop(0, stops[0]).
+		AddColorStop(1, stops[1])
+	linearFill := backend.translateBrushToFill(linear)
+	assertGradientColors(t, linearFill, stops)
+
+	radial := recording.NewRadialGradientBrush(50, 50, 0, 50).
+		AddColorStop(0, stops[0]).
+		AddColorStop(1, stops[1])
+	radialFill := backend.translateBrushToFill(radial)
+	assertGradientColors(t, radialFill, stops)
+
+	sweep := recording.NewSweepGradientBrush(50, 50, 0).
+		AddColorStop(0, stops[0]).
+		AddColorStop(1, stops[1])
+	sweepFill := backend.translateBrushToFill(sweep)
+	if got, ok := sweepFill.Paint.(creator.Color); !ok {
+		t.Fatalf("sweep fallback paint has type %T, want creator.Color", sweepFill.Paint)
+	} else if want := (creator.Color{R: stops[0].R, G: stops[0].G, B: stops[0].B}); got != want {
+		t.Errorf("sweep fallback color = %+v, want %+v", got, want)
+	}
+}
+
+func assertGradientColors(t *testing.T, fill *creator.Fill, stops []gg.RGBA) {
+	t.Helper()
+
+	gradient, ok := fill.Paint.(*creator.Gradient)
+	if !ok {
+		t.Fatalf("gradient fill paint has type %T, want *creator.Gradient", fill.Paint)
+	}
+	if len(gradient.ColorStops) != len(stops) {
+		t.Fatalf("gradient has %d color stops, want %d", len(gradient.ColorStops), len(stops))
+	}
+	for i, stop := range stops {
+		want := creator.Color{R: stop.R, G: stop.G, B: stop.B}
+		if got := gradient.ColorStops[i].Color; got != want {
+			t.Errorf("gradient color stop %d = %+v, want %+v", i, got, want)
+		}
+	}
 }
 
 func TestBackendLifecycle(t *testing.T) {
@@ -96,7 +173,7 @@ func TestBackendFillPath(t *testing.T) {
 	path.Rectangle(50, 50, 100, 80)
 
 	// Create a solid brush
-	brush := recording.NewSolidBrush(gg.RGBA{R: 255, G: 0, B: 0, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(1, 0, 0))
 
 	// Fill the path
 	backend.FillPath(path, brush, recording.FillRuleNonZero)
@@ -133,7 +210,7 @@ func TestBackendStrokePath(t *testing.T) {
 	path.Close()
 
 	// Create brush and stroke
-	brush := recording.NewSolidBrush(gg.RGBA{R: 0, G: 0, B: 255, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(0, 0, 1))
 	stroke := recording.Stroke{
 		Width:      2.0,
 		Cap:        recording.LineCapRound,
@@ -163,7 +240,7 @@ func TestBackendFillRect(t *testing.T) {
 	}
 
 	rect := recording.NewRect(20, 20, 160, 120)
-	brush := recording.NewSolidBrush(gg.RGBA{R: 0, G: 255, B: 0, A: 200})
+	brush := recording.NewSolidBrush(gg.RGBA2(0, 1, 0, 200.0/255.0))
 
 	backend.FillRect(rect, brush)
 
@@ -184,9 +261,9 @@ func TestBackendLinearGradient(t *testing.T) {
 	path.Rectangle(50, 50, 200, 150)
 
 	grad := recording.NewLinearGradientBrush(50, 50, 250, 200).
-		AddColorStop(0, gg.RGBA{R: 255, G: 0, B: 0, A: 255}).
-		AddColorStop(0.5, gg.RGBA{R: 0, G: 255, B: 0, A: 255}).
-		AddColorStop(1, gg.RGBA{R: 0, G: 0, B: 255, A: 255})
+		AddColorStop(0, gg.RGB(1, 0, 0)).
+		AddColorStop(0.5, gg.RGB(0, 1, 0)).
+		AddColorStop(1, gg.RGB(0, 0, 1))
 
 	backend.FillPath(path, grad, recording.FillRuleNonZero)
 
@@ -207,8 +284,8 @@ func TestBackendRadialGradient(t *testing.T) {
 	path.Circle(200, 150, 100)
 
 	grad := recording.NewRadialGradientBrush(200, 150, 0, 100).
-		AddColorStop(0, gg.RGBA{R: 255, G: 255, B: 0, A: 255}).
-		AddColorStop(1, gg.RGBA{R: 255, G: 0, B: 0, A: 255})
+		AddColorStop(0, gg.RGB(1, 1, 0)).
+		AddColorStop(1, gg.RGB(1, 0, 0))
 
 	backend.FillPath(path, grad, recording.FillRuleNonZero)
 
@@ -229,7 +306,7 @@ func TestBackendDashedStroke(t *testing.T) {
 	path.MoveTo(50, 150)
 	path.LineTo(350, 150)
 
-	brush := recording.NewSolidBrush(gg.RGBA{R: 0, G: 0, B: 0, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(0, 0, 0))
 	stroke := recording.Stroke{
 		Width:       3.0,
 		Cap:         recording.LineCapButt,
@@ -265,7 +342,7 @@ func TestBackendClip(t *testing.T) {
 	rect := gg.NewPath()
 	rect.Rectangle(100, 50, 200, 200)
 
-	brush := recording.NewSolidBrush(gg.RGBA{R: 255, G: 100, B: 100, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(1, 100.0/255.0, 100.0/255.0))
 	backend.FillPath(rect, brush, recording.FillRuleNonZero)
 
 	err = backend.End()
@@ -296,7 +373,7 @@ func TestBackendTransform(t *testing.T) {
 		path := gg.NewPath()
 		path.Rectangle(10, 10, 30, 30)
 
-		brush := recording.NewSolidBrush(gg.RGBA{R: 100, G: 100, B: 255, A: 255})
+		brush := recording.NewSolidBrush(gg.RGB(100.0/255.0, 100.0/255.0, 1))
 		backend.FillPath(path, brush, recording.FillRuleNonZero)
 
 		backend.Restore()
@@ -318,7 +395,7 @@ func TestBackendSaveToFile(t *testing.T) {
 	// Draw something
 	path := gg.NewPath()
 	path.Rectangle(50, 50, 300, 200)
-	brush := recording.NewSolidBrush(gg.RGBA{R: 100, G: 150, B: 200, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(100.0/255.0, 150.0/255.0, 200.0/255.0))
 	backend.FillPath(path, brush, recording.FillRuleNonZero)
 
 	err = backend.End()
@@ -366,14 +443,14 @@ func TestDocument(t *testing.T) {
 
 	path := gg.NewPath()
 	path.Rectangle(50, 50, 100, 80)
-	brush := recording.NewSolidBrush(gg.RGBA{R: 255, G: 0, B: 0, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(1, 0, 0))
 	p1.FillPath(path, brush, recording.FillRuleNonZero)
 
 	// Create second page
 	p2 := doc.NewPage(300, 400)
 	path2 := gg.NewPath()
 	path2.Circle(150, 200, 50)
-	brush2 := recording.NewSolidBrush(gg.RGBA{R: 0, G: 0, B: 255, A: 255})
+	brush2 := recording.NewSolidBrush(gg.RGB(0, 0, 1))
 	p2.FillPath(path2, brush2, recording.FillRuleNonZero)
 
 	// Verify page count
@@ -508,8 +585,8 @@ func TestSweepGradientFallback(t *testing.T) {
 
 	// Sweep gradients are not supported in PDF, should fallback to first stop color
 	grad := recording.NewSweepGradientBrush(200, 150, 0).
-		AddColorStop(0, gg.RGBA{R: 255, G: 0, B: 0, A: 255}).
-		AddColorStop(1, gg.RGBA{R: 0, G: 255, B: 0, A: 255})
+		AddColorStop(0, gg.RGB(1, 0, 0)).
+		AddColorStop(1, gg.RGB(0, 1, 0))
 
 	backend.FillPath(path, grad, recording.FillRuleNonZero)
 
@@ -525,7 +602,7 @@ func BenchmarkBackendFillPath(b *testing.B) {
 
 	path := gg.NewPath()
 	path.Rectangle(50, 50, 100, 80)
-	brush := recording.NewSolidBrush(gg.RGBA{R: 255, G: 0, B: 0, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(1, 0, 0))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -542,7 +619,7 @@ func BenchmarkBackendStrokePath(b *testing.B) {
 	path.LineTo(100, 100)
 	path.LineTo(200, 0)
 
-	brush := recording.NewSolidBrush(gg.RGBA{R: 0, G: 0, B: 0, A: 255})
+	brush := recording.NewSolidBrush(gg.RGB(0, 0, 0))
 	stroke := recording.DefaultStroke()
 
 	b.ResetTimer()
