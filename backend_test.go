@@ -99,6 +99,65 @@ func TestGradientTranslationPreservesNormalizedComponents(t *testing.T) {
 	}
 }
 
+func TestGradientStrokeUsesNormalizedFirstStopColor(t *testing.T) {
+	backend := NewBackend()
+	if err := backend.Begin(100, 100); err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := backend.End(); err != nil {
+			t.Errorf("End failed: %v", err)
+		}
+	})
+
+	want := gg.RGB(0.2, 0.4, 0.8)
+	path := gg.NewPath()
+	path.MoveTo(10, 10)
+	path.LineTo(90, 90)
+
+	tests := []struct {
+		name  string
+		brush recording.Brush
+	}{
+		{
+			name: "linear",
+			brush: recording.NewLinearGradientBrush(0, 0, 100, 100).
+				AddColorStop(0, want).
+				AddColorStop(1, gg.RGB(1, 0, 0)),
+		},
+		{
+			name: "radial",
+			brush: recording.NewRadialGradientBrush(50, 50, 0, 50).
+				AddColorStop(0, want).
+				AddColorStop(1, gg.RGB(1, 0, 0)),
+		},
+		{
+			name: "sweep",
+			brush: recording.NewSweepGradientBrush(50, 50, 0).
+				AddColorStop(0, want).
+				AddColorStop(1, gg.RGB(1, 0, 0)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			backend.StrokePath(path, tt.brush, recording.DefaultStroke())
+
+			stroke := backend.surface.CurrentStroke()
+			if stroke == nil {
+				t.Fatal("StrokePath did not configure a stroke")
+			}
+			got, ok := stroke.Paint.(creator.Color)
+			if !ok {
+				t.Fatalf("stroke paint has type %T, want creator.Color", stroke.Paint)
+			}
+			if expected := (creator.Color{R: want.R, G: want.G, B: want.B}); got != expected {
+				t.Errorf("stroke color = %+v, want first gradient stop %+v", got, expected)
+			}
+		})
+	}
+}
+
 func assertGradientColors(t *testing.T, fill *creator.Fill, stops []gg.RGBA) {
 	t.Helper()
 
