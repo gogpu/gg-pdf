@@ -271,13 +271,9 @@ func (b *Backend) translatePath(path *gg.Path) *creator.Path {
 func (b *Backend) translateBrushToFill(brush recording.Brush) *creator.Fill {
 	switch br := brush.(type) {
 	case recording.SolidBrush:
-		color := creator.Color{
-			R: float64(br.Color.R) / 255.0,
-			G: float64(br.Color.G) / 255.0,
-			B: float64(br.Color.B) / 255.0,
-		}
+		color := colorFromGG(br.Color)
 		fill := creator.NewFill(color)
-		opacity := float64(br.Color.A) / 255.0
+		opacity := br.Color.A
 		if opacity < 1.0 {
 			return fill.WithOpacity(opacity)
 		}
@@ -294,11 +290,7 @@ func (b *Backend) translateBrushToFill(brush recording.Brush) *creator.Fill {
 		// Fallback to solid color from first stop
 		if len(br.Stops) > 0 {
 			stop := br.Stops[0]
-			color := creator.Color{
-				R: float64(stop.Color.R) / 255.0,
-				G: float64(stop.Color.G) / 255.0,
-				B: float64(stop.Color.B) / 255.0,
-			}
+			color := colorFromGG(stop.Color)
 			return creator.NewFill(color)
 		}
 		return creator.NewFill(creator.Black)
@@ -316,11 +308,7 @@ func (b *Backend) translateLinearGradient(br *recording.LinearGradientBrush) *cr
 	)
 
 	for _, stop := range br.Stops {
-		color := creator.Color{
-			R: float64(stop.Color.R) / 255.0,
-			G: float64(stop.Color.G) / 255.0,
-			B: float64(stop.Color.B) / 255.0,
-		}
+		color := colorFromGG(stop.Color)
 		_ = grad.AddColorStop(stop.Offset, color)
 	}
 
@@ -335,11 +323,7 @@ func (b *Backend) translateRadialGradient(br *recording.RadialGradientBrush) *cr
 	)
 
 	for _, stop := range br.Stops {
-		color := creator.Color{
-			R: float64(stop.Color.R) / 255.0,
-			G: float64(stop.Color.G) / 255.0,
-			B: float64(stop.Color.B) / 255.0,
-		}
+		color := colorFromGG(stop.Color)
 		_ = grad.AddColorStop(stop.Offset, color)
 	}
 
@@ -369,40 +353,32 @@ func (b *Backend) translateStroke(brush recording.Brush, stroke recording.Stroke
 func (b *Backend) brushToColor(brush recording.Brush) creator.Color {
 	switch br := brush.(type) {
 	case recording.SolidBrush:
-		return creator.Color{
-			R: float64(br.Color.R) / 255.0,
-			G: float64(br.Color.G) / 255.0,
-			B: float64(br.Color.B) / 255.0,
-		}
+		return colorFromGG(br.Color)
 	case *recording.LinearGradientBrush:
 		if len(br.Stops) > 0 {
 			stop := br.Stops[0]
-			return creator.Color{
-				R: float64(stop.Color.R) / 255.0,
-				G: float64(stop.Color.G) / 255.0,
-				B: float64(stop.Color.B) / 255.0,
-			}
+			return colorFromGG(stop.Color)
 		}
 	case *recording.RadialGradientBrush:
 		if len(br.Stops) > 0 {
 			stop := br.Stops[0]
-			return creator.Color{
-				R: float64(stop.Color.R) / 255.0,
-				G: float64(stop.Color.G) / 255.0,
-				B: float64(stop.Color.B) / 255.0,
-			}
+			return colorFromGG(stop.Color)
 		}
 	case *recording.SweepGradientBrush:
 		if len(br.Stops) > 0 {
 			stop := br.Stops[0]
-			return creator.Color{
-				R: float64(stop.Color.R) / 255.0,
-				G: float64(stop.Color.G) / 255.0,
-				B: float64(stop.Color.B) / 255.0,
-			}
+			return colorFromGG(stop.Color)
 		}
 	}
 	return creator.Black
+}
+
+// colorFromGG converts gg's normalized RGBA components to a gxpdf RGB color.
+// Both packages represent RGB values in the range [0, 1], so no rescaling is
+// needed here. Alpha is handled separately by fills because gxpdf gradients
+// and RGB colors do not carry an alpha component.
+func colorFromGG(c gg.RGBA) creator.Color {
+	return creator.Color{R: c.R, G: c.G, B: c.B}
 }
 
 // translateFillRule converts a recording.FillRule to a gxpdf FillRule.
