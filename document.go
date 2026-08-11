@@ -29,19 +29,72 @@ type Document struct {
 	creator  *creator.Creator
 	pages    []*pageBackend
 	finished bool
+	newPage  func() (*creator.Page, error)
 }
 
 // pageBackend is a Backend that shares the creator with Document.
 type pageBackend struct {
 	*Backend
-	doc *Document
+	doc     *Document
+	initErr error
+	ended   bool
+}
+
+// Begin validates the page prepared by Document.NewPage. Recording playback
+// calls Begin before drawing, but a document page must keep using the creator,
+// page, and surface that belong to its Document.
+func (b *pageBackend) Begin(width, height int) error {
+	if b.initErr != nil {
+		return b.initErr
+	}
+	if b.Backend == nil || b.doc == nil || b.creator == nil || b.page == nil || b.surface == nil {
+		return fmt.Errorf("pdf: document page is not initialized")
+	}
+	if b.creator != b.doc.creator {
+		return fmt.Errorf("pdf: document page has invalid creator")
+	}
+	if b.ended {
+		return fmt.Errorf("pdf: document page is already finalized")
+	}
+	if width != int(b.width) || height != int(b.height) {
+		return fmt.Errorf(
+			"pdf: page dimensions mismatch: got %dx%d, want %dx%d",
+			width, height, int(b.width), int(b.height),
+		)
+	}
+	return nil
+}
+
+// End finalizes the document page once. Document.Finish also calls End, so it
+// must be safe when recording playback has already finalized the page.
+func (b *pageBackend) End() error {
+	if b.initErr != nil {
+		return b.initErr
+	}
+	if b.ended {
+		return nil
+	}
+	if b.Backend == nil || b.doc == nil || b.creator == nil || b.page == nil || b.surface == nil {
+		return fmt.Errorf("pdf: document page is not initialized")
+	}
+	if b.creator != b.doc.creator {
+		return fmt.Errorf("pdf: document page has invalid creator")
+	}
+
+	b.surface.Pop()
+	b.ended = true
+	return nil
 }
 
 // NewDocument creates a new multi-page PDF document.
 func NewDocument() *Document {
+	pdfCreator := creator.New()
 	return &Document{
-		creator: creator.New(),
+		creator: pdfCreator,
 		pages:   make([]*pageBackend, 0, 4),
+		newPage: func() (*creator.Page, error) {
+			return pdfCreator.NewPageWithSize(creator.A4)
+		},
 	}
 }
 
@@ -61,11 +114,16 @@ func (d *Document) NewPage(width, height int) recording.Backend {
 
 	// Store the creator reference
 	pb.creator = d.creator
+	if d.finished {
+		pb.initErr = fmt.Errorf("pdf: cannot add page to finished document")
+		return pb
+	}
 
 	// Create page with custom size (using A4 as base, will be overridden by surface)
-	page, err := d.creator.NewPageWithSize(creator.A4)
+	page, err := d.newPage()
 	if err != nil {
-		// Return backend anyway, it will fail on drawing
+		pb.initErr = fmt.Errorf("pdf: failed to create document page: %w", err)
+		d.pages = append(d.pages, pb)
 		return pb
 	}
 
@@ -100,10 +158,10 @@ func (d *Document) Finish() error {
 		return nil
 	}
 
-	// Pop the Y-flip transform from each page
+	// Finalize every page that was not already ended by recording playback.
 	for _, pb := range d.pages {
-		if pb.surface != nil {
-			pb.surface.Pop()
+		if err := pb.End(); err != nil {
+			return fmt.Errorf("pdf: failed to finish page: %w", err)
 		}
 	}
 
