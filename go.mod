@@ -3,7 +3,7 @@ module github.com/gogpu/gg-pdf
 go 1.25
 
 require (
-	github.com/coregx/gxpdf v0.2.0
+	github.com/coregx/gxpdf v0.4.0
 	github.com/gogpu/gg v0.23.0
 )
 

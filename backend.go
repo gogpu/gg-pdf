@@ -50,25 +50,33 @@ func NewBackend() *Backend {
 // Begin initializes the backend for rendering at the given dimensions.
 // This creates a new PDF document with a single page of the specified size.
 func (b *Backend) Begin(width, height int) error {
-	b.width = float64(width)
-	b.height = float64(height)
+	widthF := float64(width)
+	heightF := float64(height)
+	newCreator := creator.New()
 
-	b.creator = creator.New()
-
-	// Create custom page size
-	page, err := b.creator.NewPageWithSize(creator.A4) // Will be overridden
+	// Page dimensions are expressed in PDF points, matching the coordinate
+	// units used by the recording backend. Keep them exact instead of using a
+	// standard-size page as a placeholder.
+	page, err := newCreator.NewPageWithDimensions(widthF, heightF)
 	if err != nil {
 		return fmt.Errorf("pdf: failed to create page: %w", err)
 	}
+	surface := page.Surface()
+
+	// Stage the complete new state before replacing the current state. A
+	// failed Begin must not leave dimensions/creator from the attempted page
+	// combined with the page and surface from a previous successful Begin.
+	b.width = widthF
+	b.height = heightF
+	b.creator = newCreator
 	b.page = page
-	b.surface = page.Surface()
+	b.surface = surface
 
 	// Initialize state
 	b.currentTransform = recording.Identity()
 	b.stateStack = b.stateStack[:0]
 
-	// Apply Y-flip transform to convert from top-left to bottom-left origin
-	// We need to translate by height and flip Y axis
+	// Apply Y-flip transform to convert from top-left to bottom-left origin.
 	flipTransform := creator.Scale(1, -1).Then(creator.Translate(0, b.height))
 	b.surface.PushTransform(flipTransform)
 

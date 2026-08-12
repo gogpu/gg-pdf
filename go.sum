@@ -1,5 +1,5 @@
-github.com/coregx/gxpdf v0.2.0 h1:yya8G9kbqKAf6vHRhtnK1bFPzsYZf7psGXoNMz5iEJk=
-github.com/coregx/gxpdf v0.2.0/go.mod h1:4dO4sQIKhgjXIm/lIQl67H8OEfkvy0+4Cq02eOrZ1v4=
+github.com/coregx/gxpdf v0.4.0 h1:3Kuandv8E3v9vut01oiqA5byoRDyQalxgfDSFMGa+As=
+github.com/coregx/gxpdf v0.4.0/go.mod h1:ziVrCi95jVy1UY/XglSgEexgU0mbiY0pptkhbVgCbCI=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gogpu/gg v0.23.0 h1:n4vWtE7sCZFqNbQhqUqKVq2LD2XJxmAUVpOZagNACgo=

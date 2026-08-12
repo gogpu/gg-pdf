@@ -229,6 +229,75 @@ func TestDocumentYFlipTransform(t *testing.T) {
 	}
 }
 
+func TestBackendPageDimensions(t *testing.T) {
+	backend := NewBackend()
+	if err := backend.Begin(123, 456); err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	if err := backend.End(); err != nil {
+		t.Fatalf("End failed: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := backend.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	// Keep this assertion tied to the serialized MediaBox rather than only
+	// Backend.width/height so it catches regressions in page creation.
+	const mediaBox = "/MediaBox [0.00 0.00 123.00 456.00]"
+	if !bytes.Contains(buf.Bytes(), []byte(mediaBox)) {
+		t.Fatalf("PDF does not contain requested page dimensions %q:\n%s", mediaBox, buf.Bytes())
+	}
+	if bytes.Contains(buf.Bytes(), []byte("/MediaBox [0.00 0.00 595.00 842.00]")) {
+		t.Fatal("PDF unexpectedly uses the A4 page dimensions")
+	}
+}
+
+func TestBackendBeginRejectsNonPositiveDimensions(t *testing.T) {
+	tests := []struct {
+		name          string
+		width, height int
+	}{
+		{name: "zero width", width: 0, height: 456},
+		{name: "zero height", width: 123, height: 0},
+		{name: "negative width", width: -123, height: 456},
+		{name: "negative height", width: 123, height: -456},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := NewBackend().Begin(tt.width, tt.height); err == nil {
+				t.Fatalf("Begin(%d, %d) succeeded, want an error", tt.width, tt.height)
+			}
+		})
+	}
+}
+
+func TestBackendBeginFailurePreservesPriorState(t *testing.T) {
+	backend := NewBackend()
+	if err := backend.Begin(123, 456); err != nil {
+		t.Fatalf("initial Begin failed: %v", err)
+	}
+
+	if err := backend.Begin(0, 456); err == nil {
+		t.Fatal("invalid Begin succeeded, want an error")
+	}
+
+	// The failed Begin must leave the previous page usable. End should pop its
+	// original Y-flip transform, and serialization should still use its page.
+	if err := backend.End(); err != nil {
+		t.Fatalf("End after failed Begin failed: %v", err)
+	}
+	var buf bytes.Buffer
+	if _, err := backend.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo after failed Begin failed: %v", err)
+	}
+	if !bytes.Contains(buf.Bytes(), []byte("/MediaBox [0.00 0.00 123.00 456.00]")) {
+		t.Fatalf("failed Begin corrupted the previous page:\n%s", buf.Bytes())
+	}
+}
+
 func TestBackendSaveRestore(t *testing.T) {
 	backend := NewBackend()
 	err := backend.Begin(800, 600)
@@ -571,6 +640,30 @@ func TestDocument(t *testing.T) {
 
 	if info.Size() == 0 {
 		t.Error("PDF file should not be empty")
+	}
+}
+
+func TestDocumentPageDimensions(t *testing.T) {
+	doc := NewDocument()
+	doc.NewPage(123, 456)
+	doc.NewPage(789, 321)
+
+	var buf bytes.Buffer
+	if _, err := doc.WriteTo(&buf); err != nil {
+		t.Fatalf("WriteTo failed: %v", err)
+	}
+
+	pdf := buf.Bytes()
+	for _, mediaBox := range []string{
+		"/MediaBox [0.00 0.00 123.00 456.00]",
+		"/MediaBox [0.00 0.00 789.00 321.00]",
+	} {
+		if !bytes.Contains(pdf, []byte(mediaBox)) {
+			t.Errorf("PDF does not contain requested page dimensions %q:\n%s", mediaBox, pdf)
+		}
+	}
+	if bytes.Contains(pdf, []byte("/MediaBox [0.00 0.00 595.00 842.00]")) {
+		t.Fatal("PDF unexpectedly uses the A4 page dimensions")
 	}
 }
 

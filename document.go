@@ -29,7 +29,7 @@ type Document struct {
 	creator  *creator.Creator
 	pages    []*pageBackend
 	finished bool
-	newPage  func() (*creator.Page, error)
+	newPage  func(width, height float64) (*creator.Page, error)
 }
 
 // pageBackend is a Backend that shares the creator with Document.
@@ -92,8 +92,8 @@ func NewDocument() *Document {
 	return &Document{
 		creator: pdfCreator,
 		pages:   make([]*pageBackend, 0, 4),
-		newPage: func() (*creator.Page, error) {
-			return pdfCreator.NewPageWithSize(creator.A4)
+		newPage: func(width, height float64) (*creator.Page, error) {
+			return pdfCreator.NewPageWithDimensions(width, height)
 		},
 	}
 }
@@ -119,8 +119,9 @@ func (d *Document) NewPage(width, height int) recording.Backend {
 		return pb
 	}
 
-	// Create page with custom size (using A4 as base, will be overridden by surface)
-	page, err := d.newPage()
+	// Page dimensions are expressed in PDF points, matching the coordinate
+	// units used by the recording backend. Keep them exact for each page.
+	page, err := d.newPage(float64(width), float64(height))
 	if err != nil {
 		pb.initErr = fmt.Errorf("pdf: failed to create document page: %w", err)
 		d.pages = append(d.pages, pb)
