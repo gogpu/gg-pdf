@@ -250,27 +250,27 @@ func (b *Backend) SaveToFile(path string) error {
 func (b *Backend) translatePath(path *gg.Path) *creator.Path {
 	pdfPath := creator.NewPath()
 
-	for _, elem := range path.Elements() {
-		switch e := elem.(type) {
+	path.Iterate(func(verb gg.PathVerb, coords []float64) {
+		switch verb {
 		case gg.MoveTo:
-			pdfPath.MoveTo(e.Point.X, e.Point.Y)
+			pdfPath.MoveTo(coords[0], coords[1])
 		case gg.LineTo:
-			pdfPath.LineTo(e.Point.X, e.Point.Y)
+			pdfPath.LineTo(coords[0], coords[1])
 		case gg.QuadTo:
 			pdfPath.QuadraticTo(
-				e.Control.X, e.Control.Y,
-				e.Point.X, e.Point.Y,
+				coords[0], coords[1],
+				coords[2], coords[3],
 			)
 		case gg.CubicTo:
 			pdfPath.CubicTo(
-				e.Control1.X, e.Control1.Y,
-				e.Control2.X, e.Control2.Y,
-				e.Point.X, e.Point.Y,
+				coords[0], coords[1],
+				coords[2], coords[3],
+				coords[4], coords[5],
 			)
 		case gg.Close:
 			pdfPath.Close()
 		}
-	}
+	})
 
 	return pdfPath
 }

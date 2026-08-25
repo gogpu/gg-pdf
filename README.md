@@ -90,6 +90,16 @@ func main() {
 - Text uses Helvetica font only (custom font support planned)
 - Clipping cannot be cleared (use Save/Restore instead)
 
+## Star History
+
+<a href="https://starhistory.io">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.starhistory.io/png?repos=gogpu/gg-pdf&style=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.starhistory.io/png?repos=gogpu/gg-pdf&style=professional" />
+   <img alt="Star History Chart" src="https://api.starhistory.io/png?repos=gogpu/gg-pdf" width="800" />
+ </picture>
+</a>
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
