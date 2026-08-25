@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/coregx/gxpdf v0.4.0
-	github.com/gogpu/gg v0.52.3
+	github.com/gogpu/gg v0.52.5
 )
 
 require (
