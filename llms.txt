@@ -1,0 +1,27 @@
+# gg-pdf
+
+> PDF export backend for gg's recording system. A blank import registers the "pdf" backend: draw with
+> `recording.Recorder` (the gg drawing API), then play the recording back into `recording.NewBackend("pdf")` and save
+> it. For multi-page documents with metadata, use `pdf.NewDocument`. Supports solid fills and strokes, linear and
+> radial gradients, fill/stroke/clip paths, transforms, stroke styles (width, cap, join, dashes) and Save/Restore.
+> Known limits: sweep gradients fall back to their first stop color, text uses Helvetica only, and a clip can only be
+> undone through Save/Restore. PDF writing uses coregx/gxpdf. Go 1.25+, zero CGO. Pre-1.0: the API may change
+> before v1.0.
+
+## Docs
+
+- [API Reference](https://pkg.go.dev/github.com/gogpu/gg-pdf): package documentation
+- [README](https://github.com/gogpu/gg-pdf/blob/main/README.md): install, usage, multi-page documents, limitations
+- [CHANGELOG](https://github.com/gogpu/gg-pdf/blob/main/CHANGELOG.md): release history
+- [CONTRIBUTING](https://github.com/gogpu/gg-pdf/blob/main/CONTRIBUTING.md): how to contribute
+
+## Related
+
+- [gg](https://github.com/gogpu/gg): the 2D graphics library whose recordings this exports
+- [gg/recording](https://pkg.go.dev/github.com/gogpu/gg/recording): the recording API
+- [gg-svg](https://github.com/gogpu/gg-svg): SVG export backend
+
+## Ecosystem
+
+- [GoGPU ecosystem](https://github.com/gogpu): all modules
+- [Open Collective](https://opencollective.com/gogpu): support development
